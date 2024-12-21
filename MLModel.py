@@ -158,8 +158,11 @@ class MLModel:
                 self.col_n.append(feature)
                 if details['feature_variable_type'] == 'numerical' and details['feature_details']['missing_values'] == 'Impute':
                     strategy = 'mean' if details['feature_details']['impute_with'] == 'Average of values' else 'constant'
-                    fill_value = details['feature_details'].get('impute_value', 0)
-                    imputer.append((feature, SimpleImputer(strategy=strategy, fill_value=fill_value), [self.col_n.index(feature)]))
+                    if strategy == 'mean':
+                        imputer.append((feature, SimpleImputer(strategy=strategy), [self.col_n.index(feature)]))
+                    elif strategy == 'constant':
+                        fill_value = details['feature_details'].get('impute_value', 0)
+                        imputer.append((feature, SimpleImputer(strategy=strategy, fill_value=fill_value), [self.col_n.index(feature)]))
                 if details['feature_variable_type'] == 'text' and details['feature_details']["text_handling"] == "Tokenize and hash":
                     imputer.append((feature, OrdinalEncoder(), [self.col_n.index(feature)]))
         return ColumnTransformer(imputer, remainder='passthrough', n_jobs=-1)
@@ -302,11 +305,12 @@ class MLModel:
                 if grid:
                     if self.target['prediction_type'].lower()=='regression':
                         if algo_name in self.D_Regressor.keys():
+                            grid={ i:grid[i] for i in set(grid.keys()).intersection(set(eval(f'{self.D_Regressor[algo_name]}()').get_params()))}
                             param_grid[algo_name] = {f'{algo_name}__{key}': value for key, value in grid.items()}
                     if self.target['prediction_type'].lower()=='classification':
                         if algo_name in self.D_Classifier.keys():
+                            grid={ i:grid[i] for i in set(grid.keys()).intersection(set(eval(f'{self.D_Regressor[algo_name]}()').get_params()))}
                             param_grid[algo_name] = {f'{algo_name}__{key}': value for key, value in grid.items()}
-
         return param_grid
     
     def get_selected_models(self):
@@ -397,6 +401,7 @@ class MLModel:
             )
             grid_search.fit(X, y.values.ravel())
             metrics_dict = self.compute_general_metrics(y, grid_search.predict(X), task_type)
+            print(algo_name)
             print(metrics_dict)
             best_estimators.append((grid_search.best_estimator_))
         
